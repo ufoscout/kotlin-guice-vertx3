@@ -17,10 +17,14 @@ package io.vertx.starter;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Module;
 import com.intapp.vertx.guice.GuiceVerticleFactory;
 import com.intapp.vertx.guice.GuiceVertxDeploymentManager;
 import com.intapp.vertx.guice.VertxModule;
 
+import io.vertx.core.AsyncResult;
+import io.vertx.core.DeploymentOptions;
+import io.vertx.core.Handler;
 import io.vertx.core.Launcher;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
@@ -34,21 +38,25 @@ public class Main {
      * @param args the user command line arguments. For supported command line arguments please see {@link Launcher}.
      */
     public static void main(String[] args) {
-        new Main().launch();
+        new Main().launch(h -> {}, new AppModule());
     }
 
-    public void launch() {
+    public Injector launch(Handler<AsyncResult<String>> handler, Module... modules) {
         final Vertx vertx = Vertx.vertx(new VertxOptions());
 
-        final Injector injector = Guice.createInjector(
-            new VertxModule(vertx),
-            new AppModule());
+        final Module[] newArr = new Module[modules.length + 1];
+        System.arraycopy(modules, 0, newArr, 1, modules.length);
+        newArr[0] = new VertxModule(vertx);
+
+        final Injector injector = Guice.createInjector(newArr);
 
         final GuiceVerticleFactory guiceVerticleFactory = new GuiceVerticleFactory(injector);
         vertx.registerVerticleFactory(guiceVerticleFactory);
 
         final GuiceVertxDeploymentManager deploymentManager = new GuiceVertxDeploymentManager(vertx);
-        deploymentManager.deployVerticle(MainVerticle.class);
-}
+		deploymentManager.deployVerticle(MainVerticle.class, new DeploymentOptions(), handler);
+
+		return injector;
+	}
 
 }
